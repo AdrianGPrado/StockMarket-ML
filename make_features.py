@@ -1,4 +1,6 @@
 #create features
-test = pd.read_csv("all_quotes.csv", sep='\t', encoding='utf-8')
 
-test.head()
+#import trade data
+url = "https://raw.githubusercontent.com/AdrianGPrado/StockMarket-ML/CK/all_quotes.csv"
+quotes = pd.read_csv(url,index_col=0,parse_dates=[0], sep='\t', encoding='utf-8')
+
