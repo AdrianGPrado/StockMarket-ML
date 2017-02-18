@@ -2,7 +2,9 @@
 
 import pandas as pd
 import numpy as np
+from numpy import *
 from datetime import datetime
+from scipy.signal import argrelextrema
 
 #import trade data
 url = "https://raw.githubusercontent.com/AdrianGPrado/StockMarket-ML/CK/all_quotes.csv"
@@ -10,8 +12,9 @@ quotes = pd.read_csv(url,index_col=0,parse_dates=[0], sep='\t', encoding='utf-8'
 
 
 #initialize target DF w/ feature columns
-quotes2 = pd.DataFrame(quotes[:2000])
-quotesAll = quotes2.ix[:0]
+# quotes2 = pd.DataFrame(quotes[:2000])
+# quotesAll = quotes2.ix[:0]
+quotesAll = quotes.ix[:0]
 quotesAll["upper_band"] = ""
 quotesAll["lower_band"] = ""
 quotesAll["9d"] = ""
@@ -23,18 +26,17 @@ quotesAll["RSI"] = ""
 quotesAll["MACD"] = ""
 
 #create ticker list
-# tickerList = pd.DataFrame(quotes['Ticker'].unique())
-tickerList = pd.DataFrame(quotes2['Ticker'].unique())
+tickerList = pd.DataFrame(quotes['Ticker'].unique())
+# tickerList = pd.DataFrame(quotes2['Ticker'].unique())
 tickerList.columns = ['Ticker']
 tickerList
 
-
 # Define Indicator Functions
 
-##Bolinger_Bands
+##Bollinger_Bands
 #==============================================================
 # http://quant.stackexchange.com/questions/11264/calculating-bollinger-band-correctly
-def Bolinger_Bands(stock_price, window_size, num_of_std):
+def Bollinger_Bands(stock_price, window_size, num_of_std):
     rolling_mean = stock_price.rolling(window=window_size).mean()
     rolling_std  = stock_price.rolling(window=window_size).std()
     upper_band = pd.Series(rolling_mean + (rolling_std*num_of_std))
@@ -69,16 +71,28 @@ def MACD(group, nslow=26, nfast=12):
     result = pd.DataFrame({'MACD': emafast-emaslow, 'emaSlw': emaslow, 'emaFst': emafast})
     return result
 
+##Extrema
+#==============================================================
+#minima & maxima
+# def minmax(array):
+#     extrema_max = argrelextrema(array.values, np.greater)
+#     extrema_min = argrelextrema(array.values, np.less)
+#     result = pd.DataFrame({'local_max':extrema_max,'local_min':extrema_min})
+#     return result
+
+
 # Feature Creation on Quotes of Selected Tickers
 
 tstart = datetime.now()
+n = len(tickerList)
 for index, row in tickerList.iterrows():
     ticker = row['Ticker']
-    subquote = pd.DataFrame(quotes2[quotes2.Ticker == ticker])
+    # subquote = pd.DataFrame(quotes2[quotes2.Ticker == ticker])
+    subquote = pd.DataFrame(quotes[quotes.Ticker == ticker])
     series = pd.Series(subquote['Adj Close'])
-    #Bolindger Bands
+    #Bollinger Bands
     #==============================================================
-    BB = Bolinger_Bands(series, 30, 2)
+    BB = Bollinger_Bands(series, 20, 2)
     subquote["upper_band"] = BB["upper_band"]
     subquote["lower_band"] = BB["lower_band"]
     #Moving averages
@@ -96,13 +110,27 @@ for index, row in tickerList.iterrows():
     #==============================================================    
     MACDx = MACD(series)
     subquote["MACD"] = MACDx["MACD"]
+    #Sign-changes
+    #==============================================================    
+    b = (diff(sign(diff(series))) > 0).nonzero()[0] + 1 # local min
+    c = (diff(sign(diff(series))) < 0).nonzero()[0] + 1 # local max
+    subquote['min'] = series.iloc[b]
+    subquote['max'] = series.iloc[c]
     ## Append DF's
     #==============================================================
     quotesAll = quotesAll.append(subquote)
+    print ((float(index)/n)*100)
 tend = datetime.now()
 print(tend-tstart)
 
 
 # Validate test data
-test = pd.DataFrame(quotesAll[quotesAll.Ticker == "GGP"])
-test.tail()
+# test = pd.DataFrame(quotesAll[quotesAll.Ticker == "GGP"])
+# test.tail()
+len(quotes)==len(quotesAll)
+quotesAll.head(100)
+quotesAll.describe
+
+##save DF
+os.chdir("/Users/Collier/Dropbox/Skills/Python/Projects/Stocks/StockMarket-ML/")
+quotesAll.to_csv("all_quotes_features.csv", sep='\t', encoding='utf-8')
